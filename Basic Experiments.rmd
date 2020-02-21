@@ -1,1 +1,57 @@
+#Kaggle Lending Club Data
+
+# Examine the variables with glimpse()
+glimpse(lendingclub)
+
+# Find median loan_amnt, mean int_rate, and mean annual_inc with summarize()
+lendingclub %>% summarize(median(loan_amnt), mean(int_rate), mean(annual_inc))
+
+# Use ggplot2 to build a bar chart of purpose
+ggplot(data=lendingclub, aes(x = purpose)) + 
+	geom_bar() +
+	coord_flip()
+
+# Use recode() to create the new purpose_recode variable
+lendingclub$purpose_recode <- lendingclub$purpose %>% recode( 
+        "credit_card" = "debt_related", 
+  		"debt_consolidation" = "debt_related",
+  		"medical" = "debt_related",
+        "car" = "big_purchase", 
+  		"major_purchase" = "big_purchase", 
+  		"vacation" = "big_purchase",
+        "moving" = "life_change", 
+  		"small_business" = "life_change", 
+  		"wedding" = "life_change",
+        "house" = "home_related", 
+  		"home_improvement" = "home_related")
+      
+# How does loan purpose affect amount funded?
+
+# Build a linear regression model, purpose_recode_model
+purpose_recode_model <- lm(funded_amnt~purpose_recode, data = lendingclub)
+
+# Examine results of purpose_recode_model
+summary(purpose_recode_model)
+
+# Get anova results and save as purpose_recode_anova
+purpose_recode_anova <- anova(purpose_recode_model)
+
+# Print purpose_recode_anova
+purpose_recode_anova
+
+# Examine class of purpose_recode_anova
+class(purpose_recode_anova)
+
+# Which loan purpose mean is different?
+# Use aov() to build purpose_aov
+purpose_aov <- aov(funded_amnt~purpose_recode, data = lendingclub)
+
+# Conduct Tukey's HSD test to create tukey_output
+tukey_output<- TukeyHSD(purpose_aov, "purpose_recode", conf.level = 0.95)
+
+# Tidy tukey_output to make sense of the results
+library(broom)
+tidy(tukey_output)
+
+# Multiple Factor Experiments
 

@@ -55,3 +55,212 @@ tidy(tukey_output)
 
 # Multiple Factor Experiments
 
+# We tested whether the purpose of a loan affects loan amount funded and found that it does. However, we also know that it's unlikely 
+# that loans are funded based only on their intended purpose. It's more likely that the company is looking at a holistic picture of an # applicant before they decide to issue a loan.
+
+# Use aov() to build purpose_emp_aov
+purpose_emp_aov<- aov(funded_amnt~purpose_recode+emp_length, data=lendingclub)
+
+# Print purpose_emp_aov to the console
+purpose_emp_aov
+
+# Call summary() to see the p-values
+summary(purpose_emp_aov)
+
+# Pre-modeling EDA
+
+# Examine the summary of int_rate
+summary(lendingclub$int_rate)
+
+# Examine int_rate by grade
+lendingclub %>% 
+	group_by(grade) %>% 
+	summarize(mean = mean(int_rate), var = var(int_rate), median = median(int_rate))
+
+# Make a boxplot of int_rate by grade
+ggplot(lendingclub, aes(x = grade, y = int_rate)) + 
+	geom_boxplot()
+
+# Use aov() to create grade_aov plus call summary() to print results
+grade_aov <- aov(int_rate ~ grade, data = lendingclub)
+summary(grade_aov)
+
+# Post-modeling validation plots + variance
+# For a 2x2 grid of plots:
+par(mfrow=c(2, 2))
+
+# Plot grade_aov
+plot(grade_aov)
+
+# Bartlett's test for homogeneity of variance
+bartlett.test(int_rate ~ grade, data=lendingclub)
+
+# Kruskal-Wallis rank sum test
+# Conduct the Kruskal-Wallis rank sum test
+kruskal.test(int_rate~grade,
+             data = lendingclub)
+	     
+# Sample size for A/B test
+
+# Load the pwr package
+library(pwr)
+
+# Use the correct function from pwr to find the sample size
+pwr.t.test(n = NULL, 
+           d = 0.2,
+           sig.level = 0.05,
+           power = 0.8,
+           alternative = "two.sided")
+	   
+# Basic A/B test
+# Plot the A/B test results
+ggplot(lendingclub_ab, aes(x = Group, y = loan_amnt)) + 
+	geom_boxplot()
+
+# Conduct a two-sided t-test
+t.test(loan_amnt ~ Group, data = lendingclub_ab)
+
+# A/B tests vs. multivariable experiments
+
+# Build lendingclub_multi
+lendingclub_multi <-lm(loan_amnt~+Group+grade+verification_status, data=lendingclub_ab)
+
+# Examine lendingclub_multi results
+tidy(lendingclub_multi)
+
+# Randomized Complete (& Balanced Incomplete) Block Designs
+
+# NHANES dataset construction
+
+# Load haven
+library(haven)
+
+# Import the three datasets using read_xpt()
+nhanes_demo <- read_xpt(DEMO_file)
+nhanes_medical <- read_xpt(MCQ_file)
+nhanes_bodymeasures <- read_xpt(BMX_file)
+
+# Merge the 3 datasets you just created to create nhanes_combined
+nhanes_combined <- list(nhanes_demo, nhanes_medical, nhanes_bodymeasures) %>%
+  Reduce(function(df1, df2) inner_join(df1, df2, by = "SEQN"), .)
+  
+# Fill in the dplyr code
+nhanes_combined %>% 
+  group_by(mcq365d) %>% 
+  summarize(mean = mean(bmxwt, na.rm = TRUE))
+
+# Fill in the ggplot2 code
+nhanes_combined %>% 
+  ggplot(aes(as.factor(mcq365d), bmxwt)) +
+  geom_boxplot() +
+  labs(x = "Treatment",
+       y = "Weight")
+       
+# NHANES Data Cleaning
+# Filter to keep only those 16+
+nhanes_filter <- nhanes_combined %>% filter(ridageyr > 16)
+
+# Load simputation & impute bmxwt by riagendr
+library(simputation)
+nhanes_final <- impute_median(nhanes_filter, bmxwt ~ riagendr)
+
+# Recode mcq365d with recode() & examine with count()
+nhanes_final$mcq365d <- recode(nhanes_final$mcq365d, 
+                               `1` = 1,
+                               `2` = 2,
+                               `9` = 2)
+nhanes_final %>% count(mcq365d)
+
+# Resampling NHANES data
+
+# The NHANES data is collected on sampled units (people) specifically selected to represent the U.S. population. However, let's #resample the nhanes_final dataset in different ways so we get a feel for the different sampling methods.
+
+# Use sample_n() to create nhanes_srs
+nhanes_srs <- nhanes_final %>% sample_n(2500)
+
+# Create nhanes_stratified with group_by() and sample_n()
+nhanes_stratified <- nhanes_final %>% group_by(riagendr) %>% sample_n(2000)
+nhanes_stratified %>% 
+	count(riagendr)
+
+# Load sampling package and create nhanes_cluster with cluster()
+library(sampling)
+nhanes_cluster <- cluster(nhanes_final, "indhhin2", 6, method = "srswor")
+
+# Drawing RCBDs with Agricolae
+
+# Create designs using ls()
+designs <- ls("package:agricolae", pattern = "design")
+print(designs)
+
+# Use str() to view design.rcbd's criteria
+str(design.rcbd)
+
+# Build treats and rep
+treats <- LETTERS[1:5]
+blocks <- 4
+
+# Build my_design_rcbd and view the sketch
+my_design_rcbd <- design.rcbd(treats, r = blocks, seed = 42)
+my_design_rcbd$sketch
+
+# NHANES RCBD
+# Recall that our blocked experiment involved a treatment wherein the doctor asks the patient to reduce their fat or calories in their #diet, and we're testing the effect this has on weight (bmxwt). We plan to block by gender, which in the NHANES dataset is stored as #riagendr. Recall that blocking is done to create experimental groups that are as similar as possible. Blocking this experiment by #gender means that if we observe an effect of the treatment on bmxwt, it's more likely that the effect was actually due to the #treatment versus the individual's gender.
+
+# Use aov() to create nhanes_rcbd
+nhanes_rcbd <- aov(bmxwt ~ mcq365d + riagendr, data = nhanes_final)
+
+# Check results of nhanes_rcbd with summary()
+summary(nhanes_rcbd)
+
+# Print mean weights by mcq365d and riagendr
+nhanes_final %>% 
+	group_by(mcq365d, riagendr) %>% 
+	summarize(mean_wt = mean(bmxwt, na.rm = TRUE))
+	
+# RCBD Model Validation
+
+# Set up the 2x2 plotting grid and plot nhanes_rcbd
+par(mfrow = c(2, 2))
+plot(nhanes_rcbd)
+
+# interaction plots
+with(nhanes_final, interaction.plot(mcq365d, riagendr, bmxwt))
+
+with(nhanes_final, interaction.plot(riagendr, mcq365d, bmxwt))
+
+# Drawing BIBDs with agricolae
+
+#create my_design_bibd_1
+my_design_bibd_1 <- design.bib(LETTERS[1:3], k = 4, seed = 42)
+
+#create my_design_bibd_2
+my_design_bibd_2 <- design.bib(LETTERS[1:8], k = 3, seed = 42)
+
+#create my_design_bibd_3
+my_design_bibd_3 <- design.bib(LETTERS[1:4], k = 4, seed = 42)
+my_design_bibd_3$sketch
+
+# BIBD - cat's kidney function
+
+# Calculate lambda
+lambda(4, 3, 3)
+
+# Build the data.frame
+creatinine <- c(1.98, 1.97, 2.35, 2.09, 1.87, 1.95, 2.08, 2.01, 1.84, 2.06, 1.97, 2.22)
+food <- as.factor(c("A", "C", "D", "A", "B", "C", "B", "C", "D", "A", "B", "D"))
+color <- as.factor(rep(c("Black", "White", "Orange", "Spotted"), each = 3))
+cat_experiment <- as.data.frame(cbind(creatinine, food, color))
+
+# Create cat_model and examine with summary()
+cat_model <- aov(creatinine ~ food + color, data = cat_experiment)
+summary(cat_model)
+
+# NHANES BIBD
+# Calculate lambda
+lambda(3, 2, 2)
+
+# Create weightlift_model & examine results
+weightlift_model <- aov(bmxarmc ~ weightlift_treat + ridreth1, data = nhanes_final)
+summary(weightlift_model)
+

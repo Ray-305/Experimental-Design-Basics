@@ -1,0 +1,141 @@
+# NYC SAT Scores EDA
+# Mean, var, and median of Math score by Borough
+nyc_scores %>%
+    group_by(Borough) %>% 
+    summarize(mean = mean(Average_Score_SAT_Math, na.rm = TRUE),
+              var = var(Average_Score_SAT_Math, na.rm = TRUE),
+              median = median(Average_Score_SAT_Math, na.rm = TRUE))
+              
+# Mean, var, and median of Math score by Teacher Education Level
+nyc_scores %>%
+    group_by(Teacher_Education_Level) %>% 
+    summarize(mean = mean(Average_Score_SAT_Math, na.rm = TRUE),
+              var = var(Average_Score_SAT_Math, na.rm = TRUE),
+              median = median(Average_Score_SAT_Math, na.rm = TRUE))
+              
+# Mean, var, and median of Math score by both
+nyc_scores %>%
+    group_by(Borough, Teacher_Education_Level) %>% 
+    summarize(mean = mean(Average_Score_SAT_Math, na.rm = TRUE),
+              var = var(Average_Score_SAT_Math, na.rm = TRUE),
+              median = median(Average_Score_SAT_Math, na.rm = TRUE))
+              
+# Dealing with Missing Test Scores
+# If we want to use SAT scores as our outcome, we should examine missingness. 
+# Examine the pattern of missingness across all the variables in nyc_scores using miss_var_summary() from the naniar package. 
+# naniar integrates with Tidyverse code styling, including the pipe operator (%>%).
+
+# Load naniar
+library(naniar)
+
+# Examine missingness with miss_var_summary()
+nyc_scores %>% miss_var_summary()
+
+# Examine missingness with md.pattern()
+md.pattern(nyc_scores)
+
+# Impute the Math score by Borough
+nyc_scores_2 <- impute_median(nyc_scores, Average_Score_SAT_Math ~ Borough)
+
+# Convert Math score to numeric
+nyc_scores_2$Average_Score_SAT_Math <- as.numeric(nyc_scores_2$Average_Score_SAT_Math)
+
+# Examine scores by Borough in both datasets, before and after imputation
+nyc_scores %>% 
+	group_by(Borough) %>% 
+	summarize(median = median(Average_Score_SAT_Math, na.rm = TRUE), 
+              mean = mean(Average_Score_SAT_Math, na.rm = TRUE))
+nyc_scores_2 %>% 
+	group_by(Borough) %>% 
+	summarize(median = median(Average_Score_SAT_Math), 
+              mean = mean(Average_Score_SAT_Math))
+              
+# Drawing Latin Squares with agricolae
+
+# Load agricolae
+library(agricolae)
+
+# Design a LS with 5 treatments A:E then look at the sketch
+my_design_lsd <- design.lsd(trt = LETTERS[1:5], seed = 42)
+my_design_lsd$sketch
+
+# Latin Square with NYC SAT Scores
+
+# Build nyc_scores_ls_lm
+nyc_scores_ls_lm <- lm(Average_Score_SAT_Math ~ Tutoring_Program + Borough + Teacher_Education_Level,
+                       data = nyc_scores_ls)
+
+# Tidy the results with broom
+tidy(nyc_scores_ls_lm)
+
+# Examine the results with anova
+anova(nyc_scores_ls_lm)
+
+# NYC SAT Scores Data Viz
+# Create a boxplot of Math scores by Borough, with a title and x/y axis labels
+ggplot(nyc_scores, aes(Borough, Average_Score_SAT_Math)) +
+  geom_boxplot() + 
+  labs(title = "Average SAT Math Scores by Borough, NYC",
+  	   x = "Borough (NYC)",
+  	   y = "Average SAT Math Score (2014-15)")
+      
+# Drawing Graeco-Latin Squares with agricolae
+
+# Create trt1 and trt2
+trt1 <- LETTERS[1:5]
+trt2 <- 1:5
+
+# Create my_graeco_design
+my_graeco_design <- design.graeco(trt1, trt2, seed = 42)
+
+# Examine the parameters and sketch
+my_graeco_design$parameters
+my_graeco_design$sketch
+
+# Graeco-Latin Square with NYC SAT Scores
+
+# Build nyc_scores_gls_lm
+nyc_scores_gls_lm <- lm(Average_Score_SAT_Math ~ Tutoring_Program + Borough + Teacher_Education_Level + Homework_Type,
+                        data = nyc_scores_gls)
+
+# Tidy the results with broom
+tidy(nyc_scores_gls_lm)
+
+# Examine the results with anova
+anova(nyc_scores_gls_lm)
+
+# NYC SAT Scores Factorial EDA
+
+# Load ggplot2
+library(ggplot2)
+
+# Build the boxplot for the tutoring program vs. Math SAT score
+ggplot(nyc_scores,
+       aes(Tutoring_Program, Average_Score_SAT_Math)) + 
+       geom_boxplot()
+       
+ # Build the boxplot for percent black vs. Math SAT score
+ggplot(nyc_scores,
+       aes(Percent_Black_HL, Average_Score_SAT_Math)) + 
+    geom_boxplot()
+    
+# Build the boxplot for percent tested vs. Math SAT score
+ggplot(nyc_scores,
+       aes(Percent_Tested_HL, Average_Score_SAT_Math)) + 
+    geom_boxplot()   
+    
+# Factorial Experiment with NYC SAT Scores
+
+# Create nyc_scores_factorial and examine the results
+nyc_scores_factorial <- aov(Average_Score_SAT_Math ~ Percent_Tested_HL * Percent_Black_HL * Tutoring_Program, data = nyc_scores)
+
+tidy(nyc_scores_factorial)
+
+# Evaluating the NYC SAT Scores Factorial Model
+
+# Use shapiro.test() to test the outcome
+shapiro.test(nyc_scores$Average_Score_SAT_Math)
+
+# Plot nyc_scores_factorial to examine residuals
+par(mfrow = c(2,2))
+plot(nyc_scores_factorial)

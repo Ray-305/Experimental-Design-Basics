@@ -25,7 +25,7 @@ library(dplyr)
 # Count number of observations for each combination of supp and dose
 data(ToothGrowth) 
 ToothGrowth%>% 
-    count(supp, dose)
+    count(supp, dose) 
  
 # Blocking
 # Create a boxplot with geom_boxplot()
